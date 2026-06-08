@@ -141,7 +141,7 @@ class Goal(db.Model):
 
 
 class ProgressLog(db.Model):
-    """Логирование прогресса по целям (для календаря)."""
+    """Логирование прогресса по целям."""
 
     __tablename__ = "progress_logs"
 
