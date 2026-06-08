@@ -1,0 +1,147 @@
+{% extends "base.html" %} {% block title %}Профиль и рекомендации{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-lg-6 mb-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="h4 mb-3">Данные для персонализации</h1>
+        <p class="text-muted small">
+          По этим полям считаются BMR (Миффлин — Сан Жеор), TDEE и ориентиры по
+          калориям под выбранную цель.
+        </p>
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="mb-3">
+            {{ form.height_cm.label(class="form-label") }} {{
+            form.height_cm(class="form-control") }} {% for e in
+            form.height_cm.errors %}
+            <div class="text-danger small">{{ e }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            {{ form.weight_kg.label(class="form-label") }} {{
+            form.weight_kg(class="form-control") }} {% for e in
+            form.weight_kg.errors %}
+            <div class="text-danger small">{{ e }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            {{ form.age_years.label(class="form-label") }} {{
+            form.age_years(class="form-control") }} {% for e in
+            form.age_years.errors %}
+            <div class="text-danger small">{{ e }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3 form-check">
+            {{ form.is_male(class="form-check-input") }} {{
+            form.is_male.label(class="form-check-label") }}
+          </div>
+          <div class="mb-3">
+            {{ form.activity_level.label(class="form-label") }} {{
+            form.activity_level(class="form-select") }}
+          </div>
+          <div class="mb-3">
+            {{ form.goal_code.label(class="form-label") }} {{
+            form.goal_code(class="form-select") }}
+            <div class="form-text">
+              Подбор тренировочной программы: в админке у программы задайте «Тип
+              цели» тем же кодом (<code>lose_weight</code>,
+              <code>maintain</code>, <code>recomp</code>,
+              <code>gain_muscle</code>).
+            </div>
+          </div>
+          <div class="mb-3">
+            {{ form.goal.label(class="form-label") }} {{
+            form.goal(class="form-control") }}
+          </div>
+          {{ form.submit(class="btn btn-primary") }}
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div id="recommendations" class="card shadow-sm border-info mb-4">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Персонализированные рекомендации</h2>
+        {% if summary %}
+        <ul class="list-unstyled mb-3">
+          <li>
+            <strong>ИМТ:</strong> {{ summary.bmi }} — {{ summary.bmi_category }}
+          </li>
+          <li>
+            <strong>BMR:</strong> {{ "%.0f"|format(summary.bmr) }} ккал/сут
+          </li>
+          <li>
+            <strong>TDEE (оценка):</strong> {{ "%.0f"|format(summary.tdee) }}
+            ккал/сут
+          </li>
+        </ul>
+        <h3 class="h6">{{ summary.plan.headline }}</h3>
+        <p class="mb-2">
+          <strong>Ориентир по калориям:</strong>
+          {{ summary.plan.target_min_kcal }}–{{ summary.plan.target_max_kcal }}
+          ккал/сут
+        </p>
+        <ul class="small text-muted">
+          {% for line in summary.plan.bullets %}
+          <li>{{ line }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted mb-0">
+          Сохраните профиль с корректными данными — здесь появятся расчёты и
+          советы.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 mb-2">Индивидуальная программа тренировок</h2>
+        {% if assigned_program %}
+        <p class="mb-2">
+          Назначена: <strong>{{ assigned_program.name }}</strong>
+          {% if assigned_program.goal_type %}
+          <span class="badge bg-secondary ms-1"
+            >{{ assigned_program.goal_type }}</span
+          >
+          {% endif %}
+        </p>
+        <a
+          class="btn btn-outline-primary btn-sm"
+          href="{{ url_for('main.my_program') }}"
+          >Открыть план по дням</a
+        >
+        {% else %}
+        <p class="text-muted small mb-2">
+          После сохранения профиля система попытается найти программу в
+          каталоге, у которой в админ-панели поле «goal_type» совпадает с вашей
+          целью (например <code>lose_weight</code>).
+        </p>
+        <p class="text-muted small mb-0">
+          Если программ ещё нет — добавьте их в разделе «Программы тренировок» в
+          /admin.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <h2 class="h5 mb-2">Календарь прогресса</h2>
+        <p class="text-muted small mb-3">
+          Отслеживайте достижение целей по весу/телу, логируйте свои значения и
+          видьте прогресс на интерактивном календаре.
+        </p>
+        <a
+          class="btn btn-outline-success btn-sm"
+          href="{{ url_for('main.calendar') }}"
+          >Перейти к календарю</a
+        >
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

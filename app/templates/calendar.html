@@ -1,0 +1,495 @@
+{% extends "base.html" %} {% block title %}Календарь прогресса{% endblock %} {%
+block content %}
+<div class="mb-3">
+  <a href="{{ url_for('main.profile') }}" class="text-decoration-none"
+    >← К профилю</a
+  >
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h1 class="h4 mb-3">Календарь прогресса</h1>
+
+    <!-- Выбор месяца и года -->
+    <div class="row mb-3 align-items-center">
+      <div class="col-auto">
+        <div class="input-group">
+          <button
+            class="btn btn-outline-secondary"
+            type="button"
+            id="prevMonth"
+          >
+            ← Назад
+          </button>
+          <input
+            type="month"
+            id="monthPicker"
+            class="form-control"
+            style="max-width: 150px"
+            value="{{ '%04d-%02d' % (year, month) }}"
+          />
+          <button
+            class="btn btn-outline-secondary"
+            type="button"
+            id="nextMonth"
+          >
+            Вперед →
+          </button>
+        </div>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary btn-sm" id="todayBtn">Сегодня</button>
+      </div>
+    </div>
+
+    <!-- Выбор цели для логирования (опционально) -->
+    {% if goals %}
+    <div class="mb-3">
+      <label for="goalSelect" class="form-label">Цель для отслеживания:</label>
+      <select class="form-select" id="goalSelect">
+        <option value="">-- Не выбрано --</option>
+        {% for goal in goals %}
+        <option value="{{ goal.id }}">
+          {{ goal.goal_type }} ({{ goal.current_value }} / {{ goal.target_value
+          }} {{ goal.unit }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <div class="small text-muted mb-1">Ваши цели в системе:</div>
+      <div class="d-flex flex-column gap-1">
+        {% for goal in goals %}
+        <div class="border rounded px-2 py-1 small">
+          <strong>{{ goal.goal_type }}</strong>:
+          {{ goal.current_value }} → {{ goal.target_value }} {{ goal.unit }}
+          {% if goal.deadline %}
+          <span class="text-muted">до {{ goal.deadline.strftime('%d.%m.%Y') }}</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+      Нет целей. Добавьте цели через
+      <a href="/admin">админ-панель</a> или свяжитесь с
+      администратором.
+    </div>
+    {% endif %}
+
+    <!-- Календарь -->
+    <div class="calendar-container">
+      <div class="table-responsive">
+        <table class="table table-bordered calendar-table">
+          <thead>
+            <tr class="table-light">
+              <th class="text-center">Пн</th>
+              <th class="text-center">Вт</th>
+              <th class="text-center">Ср</th>
+              <th class="text-center">Чт</th>
+              <th class="text-center">Пт</th>
+              <th class="text-center">Сб</th>
+              <th class="text-center">Вс</th>
+            </tr>
+          </thead>
+          <tbody id="calendarBody">
+            <!-- Будет заполнено JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно для логирования -->
+<div class="modal fade" id="logModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalTitle">Логирование прогресса</h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <form id="logForm">
+          <div class="mb-3">
+            <label for="logDate" class="form-label">Дата:</label>
+            <input type="date" class="form-control" id="logDate" required />
+          </div>
+          <div class="mb-3">
+            <label for="logGoal" class="form-label">Цель:</label>
+            <select class="form-select" id="logGoal" required>
+              <option value="">-- Выберите цель --</option>
+              {% for goal in goals %}
+              <option value="{{ goal.id }}" data-unit="{{ goal.unit }}">
+                {{ goal.goal_type }} ({{ goal.unit }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="logValue" class="form-label">Значение:</label>
+            <div class="input-group">
+              <input
+                type="number"
+                step="0.1"
+                class="form-control"
+                id="logValue"
+                required
+              />
+              <span class="input-group-text" id="unitLabel">—</span>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="logNotes" class="form-label"
+              >Заметки (опционально):</label
+            >
+            <textarea class="form-control" id="logNotes" rows="2"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Отмена
+        </button>
+        <button
+          type="button"
+          class="btn btn-danger"
+          id="deleteLogBtn"
+          style="display: none"
+        >
+          Удалить
+        </button>
+        <button type="button" class="btn btn-primary" id="saveLogBtn">
+          Сохранить
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .calendar-table {
+    margin-bottom: 0;
+  }
+
+  .calendar-table td {
+    height: 100px;
+    vertical-align: top;
+    padding: 5px;
+    cursor: pointer;
+    position: relative;
+    background-color: #ffffff;
+    transition: background-color 0.2s;
+  }
+
+  .calendar-table td:hover {
+    background-color: #f8f9fa;
+  }
+
+  .calendar-table td.other-month {
+    background-color: #f0f0f0;
+    color: #999;
+  }
+
+  .calendar-table td.today {
+    background-color: #e7f3ff;
+    border: 2px solid #0066cc;
+  }
+
+  .calendar-table td.has-logs {
+    background-color: #e8f5e9;
+  }
+
+  .day-number {
+    font-weight: bold;
+    margin-bottom: 3px;
+    display: inline-block;
+  }
+
+  .day-logs {
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+
+  .log-entry {
+    background-color: #d4edda;
+    padding: 2px 4px;
+    border-radius: 3px;
+    margin: 2px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .log-entry.weight {
+    background-color: #cfe2ff;
+    color: #084298;
+  }
+
+  .log-entry.body_fat {
+    background-color: #ffe5e5;
+    color: #842029;
+  }
+
+  .log-entry.muscle {
+    background-color: #d1ecf1;
+    color: #0c5460;
+  }
+</style>
+
+<script>
+  const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                       'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+  let currentYear = {{ year }};
+  let currentMonth = {{ month }};
+  let currentLogs = {};
+  let currentEditingLogId = null;
+  let goals = {{ goals_json|tojson }};
+
+  const goalsMap = {};
+  goals.forEach(g => {
+    goalsMap[g.id] = g;
+  });
+
+  function renderCalendar() {
+    const firstDay = new Date(currentYear, currentMonth - 1, 1);
+    const lastDay = new Date(currentYear, currentMonth, 0);
+    const prevLastDay = new Date(currentYear, currentMonth - 1, 0);
+
+    const firstDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Пн=0
+    const lastDayOfMonth = lastDay.getDate();
+    const prevLastDayOfMonth = prevLastDay.getDate();
+
+    const calendarBody = document.getElementById('calendarBody');
+    calendarBody.innerHTML = '';
+
+    let dayCounter = 1;
+    let prevMonthDays = prevLastDayOfMonth - firstDayOfWeek + 1;
+
+    for (let week = 0; week < 6; week++) {
+      const row = document.createElement('tr');
+
+      for (let day = 0; day < 7; day++) {
+        const cell = document.createElement('td');
+        let dateStr = '';
+        let isCurrentMonth = true;
+
+        if (week === 0 && day < firstDayOfWeek) {
+          // Дни предыдущего месяца
+          cell.textContent = prevMonthDays;
+          cell.classList.add('other-month');
+          prevMonthDays++;
+          isCurrentMonth = false;
+        } else if (dayCounter > lastDayOfMonth) {
+          // Дни следующего месяца
+          cell.textContent = dayCounter - lastDayOfMonth;
+          cell.classList.add('other-month');
+          dayCounter++;
+          isCurrentMonth = false;
+        } else {
+          // Текущий месяц
+          const dateObj = new Date(currentYear, currentMonth - 1, dayCounter);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          dateStr = formatDate(dateObj);
+
+          if (dateObj.getTime() === today.getTime()) {
+            cell.classList.add('today');
+          }
+
+          cell.innerHTML = `<div class="day-number">${dayCounter}</div>`;
+
+          // Добавляем логи за этот день
+          if (currentLogs[dayCounter]) {
+            cell.classList.add('has-logs');
+            const logsDiv = document.createElement('div');
+            logsDiv.className = 'day-logs';
+
+            currentLogs[dayCounter].forEach(log => {
+              const logSpan = document.createElement('div');
+              logSpan.className = 'log-entry ' + log.goal_type;
+              logSpan.textContent = `${log.value} ${log.unit}`;
+              logSpan.title = log.notes || '';
+              logsDiv.appendChild(logSpan);
+            });
+
+            cell.appendChild(logsDiv);
+          }
+
+          cell.dataset.date = dateStr;
+          cell.dataset.day = dayCounter;
+
+          dayCounter++;
+        }
+
+        if (isCurrentMonth && dateStr) {
+          cell.addEventListener('click', () => openLogModal(dateStr));
+        }
+
+        row.appendChild(cell);
+      }
+
+      calendarBody.appendChild(row);
+
+      if (dayCounter > lastDayOfMonth && week > 3) {
+        break;
+      }
+    }
+
+    // Обновляем заголовок
+    document.title = `${MONTH_NAMES[currentMonth - 1]} ${currentYear} — Календарь прогресса`;
+  }
+
+  function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function loadMonthLogs(year, month) {
+    fetch(`/api/calendar/${year}/${month}`)
+      .then(r => r.json())
+      .then(data => {
+        currentLogs = data;
+        renderCalendar();
+      })
+      .catch(e => console.error('Error loading logs:', e));
+  }
+
+  function openLogModal(dateStr) {
+    const modal = new bootstrap.Modal(document.getElementById('logModal'));
+
+    document.getElementById('logDate').value = dateStr;
+    document.getElementById('logForm').reset();
+    document.getElementById('deleteLogBtn').style.display = 'none';
+    currentEditingLogId = null;
+    document.getElementById('unitLabel').textContent = '—';
+
+    const selectedGoalId = document.getElementById('goalSelect')?.value;
+    if (selectedGoalId) {
+      const logGoal = document.getElementById('logGoal');
+      logGoal.value = selectedGoalId;
+      const option = logGoal.options[logGoal.selectedIndex];
+      document.getElementById('unitLabel').textContent = option?.dataset?.unit || '—';
+    }
+
+    // Установим фокус на цель
+    setTimeout(() => document.getElementById('logGoal').focus(), 100);
+
+    modal.show();
+  }
+
+  document.getElementById('logGoal').addEventListener('change', (e) => {
+    const goalId = e.target.value;
+    const unit = e.target.options[e.target.selectedIndex].dataset.unit;
+    document.getElementById('unitLabel').textContent = unit || '—';
+  });
+
+  document.getElementById('saveLogBtn').addEventListener('click', () => {
+    const logDate = document.getElementById('logDate').value;
+    const goalId = document.getElementById('logGoal').value;
+    const value = parseFloat(document.getElementById('logValue').value);
+    const notes = document.getElementById('logNotes').value;
+
+    if (!logDate || !goalId || isNaN(value)) {
+      alert('Заполните все обязательные поля');
+      return;
+    }
+
+    fetch('/api/log-progress', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        log_date: logDate,
+        goal_id: parseInt(goalId),
+        value: value,
+        notes: notes,
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        alert('Ошибка: ' + data.error);
+      } else {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('logModal'));
+        modal.hide();
+        loadMonthLogs(currentYear, currentMonth);
+      }
+    })
+    .catch(e => {
+      alert('Ошибка при сохранении: ' + e);
+    });
+  });
+
+  document.getElementById('deleteLogBtn').addEventListener('click', () => {
+    if (!currentEditingLogId) return;
+
+    if (!confirm('Вы уверены?')) return;
+
+    fetch(`/api/delete-log/${currentEditingLogId}`, {
+      method: 'DELETE',
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        alert('Ошибка: ' + data.error);
+      } else {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('logModal'));
+        modal.hide();
+        loadMonthLogs(currentYear, currentMonth);
+      }
+    });
+  });
+
+  document.getElementById('prevMonth').addEventListener('click', () => {
+    currentMonth--;
+    if (currentMonth < 1) {
+      currentMonth = 12;
+      currentYear--;
+    }
+    updateMonthPicker();
+  });
+
+  document.getElementById('nextMonth').addEventListener('click', () => {
+    currentMonth++;
+    if (currentMonth > 12) {
+      currentMonth = 1;
+      currentYear++;
+    }
+    updateMonthPicker();
+  });
+
+  document.getElementById('monthPicker').addEventListener('change', (e) => {
+    const [year, month] = e.target.value.split('-');
+    currentYear = parseInt(year);
+    currentMonth = parseInt(month);
+    loadMonthLogs(currentYear, currentMonth);
+  });
+
+  document.getElementById('todayBtn').addEventListener('click', () => {
+    const today = new Date();
+    currentYear = today.getFullYear();
+    currentMonth = today.getMonth() + 1;
+    updateMonthPicker();
+  });
+
+  function updateMonthPicker() {
+    const monthValue = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    document.getElementById('monthPicker').value = monthValue;
+    loadMonthLogs(currentYear, currentMonth);
+  }
+
+  // Инициализация
+  loadMonthLogs(currentYear, currentMonth);
+</script>
+{% endblock %}
