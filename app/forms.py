@@ -42,7 +42,7 @@ class ProfileForm(FlaskForm):
         validators=[DataRequired()],
     )
     goal_code = SelectField(
-        "Цель по весу / телу",
+        "Цель",
         choices=[
             ("lose_weight", "Снижение веса"),
             ("maintain", "Поддержание веса"),
