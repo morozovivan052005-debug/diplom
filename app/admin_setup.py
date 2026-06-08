@@ -223,4 +223,4 @@ def init_admin(app):
             ProgramExercise, db.session, name="Упражнения в программах", endpoint="admin_program_exercises"
         )
     )
-    admin.add_link(MenuLink(name="Выйти", url="/auth/logout"))
+    admin.add_link(MenuLink(name="На сайт", url="/"))
