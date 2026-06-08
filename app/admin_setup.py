@@ -1,6 +1,7 @@
 from flask import redirect, request, url_for
-from flask_admin import Admin
+from flask_admin import Admin, AdminIndexView, expose
 from flask_admin.contrib.sqla import ModelView
+from flask_admin.menu import MenuLink
 from flask_login import current_user
 
 from app import db
@@ -16,6 +17,15 @@ class SecureModelView(ModelView):
 
     def inaccessible_callback(self, name, **kwargs):
         return redirect(url_for("auth.login", next=request.url))
+
+
+class HiddenAdminIndexView(AdminIndexView):
+    def is_visible(self):
+        return False
+
+    @expose("/")
+    def index(self):
+        return redirect(url_for("admin_users.index_view"))
 
 
 class UserAdminView(SecureModelView):
@@ -190,7 +200,13 @@ class ProgramExerciseAdminView(SecureModelView):
 
 
 def init_admin(app):
-    admin = Admin(app, name="Админ-панель", template_mode="bootstrap4", url="/admin")
+    admin = Admin(
+        app,
+        name="Админ-панель",
+        template_mode="bootstrap4",
+        url="/admin",
+        index_view=HiddenAdminIndexView(url="/admin"),
+    )
 
     admin.add_view(UserAdminView(User, db.session, name="Пользователи", endpoint="admin_users"))
     admin.add_view(
@@ -207,3 +223,4 @@ def init_admin(app):
             ProgramExercise, db.session, name="Упражнения в программах", endpoint="admin_program_exercises"
         )
     )
+    admin.add_link(MenuLink(name="Выйти", url="/auth/logout"))
