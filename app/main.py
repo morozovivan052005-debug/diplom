@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
 
 from app import db
 from app.forms import ProfileForm, ProgramSelectForm
-from app.models import Goal, ProgramExercise, ProgressLog, TrainingProgram, UserProfile
+from app.models import ProgramExercise, TrainingProgram, UserProfile
 from app.utils.bmr import ACTIVITY_MULTIPLIERS, bmr_mifflin_st_jeor, tdee_from_bmr
 from app.utils.recommendations import bmi as calc_bmi
 from app.utils.recommendations import build_summary
@@ -44,9 +43,8 @@ def profile():
             form.height_cm.data = prof.height_cm
             form.weight_kg.data = prof.weight_kg
             form.age_years.data = prof.age_years
-            form.is_male.data = prof.is_male
+            form.gender.data = "male" if prof.is_male else "female"
             form.activity_level.data = prof.activity_level
-            form.goal.data = prof.goal or ""
             form.goal_code.data = prof.goal_code or "maintain"
 
     if form.validate_on_submit():
@@ -57,9 +55,9 @@ def profile():
         prof.height_cm = form.height_cm.data
         prof.weight_kg = form.weight_kg.data
         prof.age_years = form.age_years.data
-        prof.is_male = form.is_male.data
+        prof.is_male = form.gender.data == "male"
         prof.activity_level = form.activity_level.data
-        prof.goal = form.goal.data or None
+        prof.goal = None
         prof.goal_code = form.goal_code.data
 
         matched = _find_program_for_goal(prof.goal_code)
@@ -163,147 +161,3 @@ def my_program():
         all_programs=all_programs,
         select_form=select_form,
     )
-
-
-@bp.route("/calendar", methods=["GET"])
-@login_required
-def calendar():
-    """Отображение интерактивного календаря с целями и логированием прогресса."""
-    goals = (
-        Goal.query.filter_by(user_id=current_user.id)
-        .order_by(Goal.created_at.desc(), Goal.id.desc())
-        .all()
-    )
-    goals_json = [
-        {
-            "id": goal.id,
-            "goal_type": goal.goal_type,
-            "current_value": float(goal.current_value),
-            "target_value": float(goal.target_value),
-            "unit": goal.unit,
-        }
-        for goal in goals
-    ]
-
-    # Получаем текущий месяц и год из параметров запроса (если есть)
-    from datetime import date
-    today = date.today()
-    year = request.args.get("year", default=today.year, type=int)
-    month = request.args.get("month", default=today.month, type=int)
-
-    return render_template(
-        "calendar.html",
-        goals=goals,
-        goals_json=goals_json,
-        year=year,
-        month=month,
-        today=today,
-    )
-
-
-@bp.route("/api/calendar/<int:year>/<int:month>")
-@login_required
-def api_calendar(year: int, month: int):
-    """API для получения логирования за месяц."""
-    logs = ProgressLog.query.filter(
-        ProgressLog.user_id == current_user.id,
-        db.func.extract("year", ProgressLog.log_date) == year,
-        db.func.extract("month", ProgressLog.log_date) == month,
-    ).all()
-
-    goal_ids = {log.goal_id for log in logs if log.goal_id}
-    goals_map = {}
-    if goal_ids:
-        goals_map = {
-            goal.id: goal
-            for goal in Goal.query.filter(Goal.id.in_(goal_ids), Goal.user_id == current_user.id).all()
-        }
-
-    result = {}
-    for log in logs:
-        day = log.log_date.day
-        if day not in result:
-            result[day] = []
-
-        goal = goals_map.get(log.goal_id) if log.goal_id else None
-        result[day].append({
-            "id": log.id,
-            "goal_id": log.goal_id,
-            "goal_type": goal.goal_type if goal else "custom",
-            "value": float(log.value),
-            "unit": goal.unit if goal else "",
-            "notes": log.notes or "",
-        })
-
-    return jsonify(result)
-
-
-@bp.route("/api/log-progress", methods=["POST"])
-@login_required
-def api_log_progress():
-    """API для добавления/обновления логирования прогресса."""
-    data = request.get_json()
-
-    log_date_str = data.get("log_date")
-    goal_id = data.get("goal_id")
-    value = data.get("value")
-    notes = data.get("notes", "")
-
-    if not log_date_str or value is None:
-        return jsonify({"error": "Missing required fields"}), 400
-
-    try:
-        log_date = datetime.strptime(log_date_str, "%Y-%m-%d").date()
-        goal_id = int(goal_id)
-        value = float(value)
-    except ValueError:
-        return jsonify({"error": "Invalid input format"}), 400
-
-    goal = Goal.query.filter_by(id=goal_id, user_id=current_user.id).first()
-    if not goal:
-        return jsonify({"error": "Goal not found for current user"}), 404
-
-    # Проверяем, существует ли уже такое логирование
-    existing = ProgressLog.query.filter_by(
-        user_id=current_user.id,
-        log_date=log_date,
-        goal_id=goal_id,
-    ).first()
-
-    if existing:
-        existing.value = value
-        existing.notes = notes
-        db.session.commit()
-        return jsonify({
-            "id": existing.id,
-            "status": "updated",
-        })
-    else:
-        new_log = ProgressLog(
-            user_id=current_user.id,
-            goal_id=goal.id,
-            log_date=log_date,
-            value=value,
-            notes=notes,
-        )
-        db.session.add(new_log)
-        db.session.commit()
-        return jsonify({
-            "id": new_log.id,
-            "status": "created",
-        }), 201
-
-
-@bp.route("/api/delete-log/<int:log_id>", methods=["DELETE"])
-@login_required
-def api_delete_log(log_id: int):
-    """API для удаления логирования прогресса."""
-    log = ProgressLog.query.get(log_id)
-    
-    if not log or log.user_id != current_user.id:
-        return jsonify({"error": "Not found"}), 404
-    
-    db.session.delete(log)
-    db.session.commit()
-    
-    return jsonify({"status": "deleted"})
