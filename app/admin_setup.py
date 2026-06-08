@@ -4,7 +4,7 @@ from flask_admin.contrib.sqla import ModelView
 from flask_login import current_user
 
 from app import db
-from app.models import Exercise, Goal, ProgramExercise, ProgressLog, TrainingProgram, User, UserProfile
+from app.models import Exercise, ProgramExercise, TrainingProgram, User, UserProfile
 
 
 class SecureModelView(ModelView):
@@ -189,75 +189,6 @@ class ProgramExerciseAdminView(SecureModelView):
     }
 
 
-class GoalAdminView(SecureModelView):
-    """Админ-представление для целей по весу/телу."""
-    column_list = ("id", "user", "goal_type", "current_value", "target_value", "unit", "deadline")
-    column_searchable_list = ("goal_type", "unit")
-    form_columns = ("user", "goal_type", "current_value", "target_value", "unit", "deadline", "notes")
-    column_labels = {
-        "user": "Пользователь",
-        "goal_type": "Тип цели",
-        "current_value": "Текущее значение",
-        "target_value": "Целевое значение",
-        "unit": "Единица измерения",
-        "deadline": "Срок",
-        "notes": "Заметки"
-    }
-    form_choices = {
-        "goal_type": [
-            ("weight", "Вес"),
-            ("body_fat", "Процент жира"),
-            ("muscle", "Мышечная масса"),
-            ("waist", "Талия"),
-        ],
-        "unit": [
-            ("кг", "кг"),
-            ("%", "%"),
-            ("см", "см"),
-        ],
-    }
-    form_widget_args = {
-        "current_value": {"placeholder": "82.5"},
-        "target_value": {"placeholder": "76"},
-        "deadline": {"placeholder": "2026-08-31"},
-    }
-    form_args = {
-        "notes": {
-            "description": "Пример: цель на 12 недель.",
-            "render_kw": {"placeholder": "Например: цель на 12 недель"}
-        },
-    }
-    can_delete = True
-    can_create = True
-
-
-class ProgressLogAdminView(SecureModelView):
-    """Админ-представление для логирования прогресса."""
-    column_list = ("id", "user", "goal", "log_date", "value", "created_at")
-    column_searchable_list = ()
-    form_columns = ("user", "goal", "log_date", "value", "notes")
-    column_labels = {
-        "user": "Пользователь",
-        "goal": "Цель",
-        "log_date": "Дата логирования",
-        "value": "Значение",
-        "notes": "Заметки",
-        "created_at": "Создано"
-    }
-    form_widget_args = {
-        "log_date": {"placeholder": "2026-06-08"},
-        "value": {"placeholder": "80.5"},
-    }
-    form_args = {
-        "notes": {
-            "description": "Пример: замер утром натощак.",
-            "render_kw": {"placeholder": "Например: замер утром натощак"}
-        },
-    }
-    can_delete = True
-    can_create = True
-
-
 def init_admin(app):
     admin = Admin(app, name="Админ-панель", template_mode="bootstrap4", url="/admin")
 
@@ -276,10 +207,3 @@ def init_admin(app):
             ProgramExercise, db.session, name="Упражнения в программах", endpoint="admin_program_exercises"
         )
     )
-    admin.add_view(
-        GoalAdminView(Goal, db.session, name="Цели", endpoint="admin_goals")
-    )
-    admin.add_view(
-        ProgressLogAdminView(ProgressLog, db.session, name="Логирование прогресса", endpoint="admin_progress_logs")
-    )
-
