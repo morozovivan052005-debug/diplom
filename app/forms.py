@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import BooleanField, FloatField, HiddenField, IntegerField, PasswordField, SelectField, StringField, SubmitField, TextAreaField
-from wtforms.validators import DataRequired, Email, EqualTo, Length, NumberRange, Optional
+from wtforms import FloatField, HiddenField, IntegerField, PasswordField, SelectField, StringField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, Email, EqualTo, Length, NumberRange
 
 
 class RegistrationForm(FlaskForm):
@@ -22,7 +22,14 @@ class ProfileForm(FlaskForm):
     height_cm = FloatField("Рост (см)", validators=[DataRequired(), NumberRange(min=50, max=250)])
     weight_kg = FloatField("Вес (кг)", validators=[DataRequired(), NumberRange(min=20, max=400)])
     age_years = IntegerField("Возраст (лет)", validators=[DataRequired(), NumberRange(min=14, max=120)])
-    is_male = BooleanField("Пол: мужской (снять — женский)")
+    gender = SelectField(
+        "Пол",
+        choices=[
+            ("male", "Мужчина"),
+            ("female", "Женщина"),
+        ],
+        validators=[DataRequired()],
+    )
     activity_level = SelectField(
         "Уровень активности",
         choices=[
@@ -44,7 +51,6 @@ class ProfileForm(FlaskForm):
         ],
         validators=[DataRequired()],
     )
-    goal = StringField("Комментарий к цели (необязательно)", validators=[Optional(), Length(max=128)])
     submit = SubmitField("Сохранить профиль")
 
 
